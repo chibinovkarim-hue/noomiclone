@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>NoomiClone HTML5 — Ragdoll Gymnastics</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            background: #1e272e;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 25px;
+            pointer-events: none;
+            color: #2c3e50;
+        }
+        #score {
+            font-size: 42px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 0 rgba(255,255,255,0.6);
+        }
+        #combo {
+            font-size: 22px;
+            font-weight: 800;
+            color: #e74c3c;
+            margin-top: 2px;
+        }
+        #trickPopup {
+            position: fixed;
+            top: 22%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.45);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        #topControls {
+            position: fixed;
+            top: 20px;
+            right: 25px;
+            display: flex;
+            gap: 10px;
+        }
+        .top-btn {
+            background: rgba(44, 62, 80, 0.85);
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.15s;
+        }
+        .top-btn:hover { background: rgba(52, 73, 94, 0.95); }
+        .top-btn:active { transform: scale(0.95); }
+        .top-btn.active { background: #e74c3c; border-color: #fff; }
+
+        #controls {
+            position: fixed;
+            bottom: 22px;
+            left: 25px;
+            right: 25px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+        }
+        .ctrl-btn {
+            width: 76px;
+            height: 76px;
+            border-radius: 16px;
+            border: 3px solid rgba(255,255,255,0.65);
+            color: #fff;
+            font-weight: 800;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            transition: transform 0.08s, filter 0.1s;
+            opacity: 0.82;
+        }
+        .ctrl-btn span { font-size: 11px; opacity: 0.85; margin-top: 4px; }
+        .ctrl-btn.pressed {
+            transform: scale(0.92);
+            opacity: 1;
+            border-color: #fff;
+            filter: brightness(1.18);
+        }
+        #btnArch { background: #3498db; }
+        #btnTuck { background: #2ecc71; }
+        #btnPike { background: #f1c40f; color: #2c3e50; border-color: rgba(44,62,80,0.4); }
+        #btnLayout { background: #9b59b6; }
+        #btnSlow { background: #34495e; }
+        #btnLimp { background: #e67e22; }
+        #btnRelease { background: #e74c3c; width: 110px; }
+
+        #replayBar {
+            position: fixed;
+            bottom: 115px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 500px;
+            max-width: 85vw;
+            background: rgba(30, 39, 46, 0.85);
+            padding: 12px 18px;
+            border-radius: 12px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        #replaySlider { flex: 1; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="hud">
+    <div id="score">0</div>
+    <div id="combo"></div>
+</div>
+
+<div id="trickPopup">DOUBLE FLIP!</div>
+
+<div id="topControls">
+    <button class="top-btn" id="modeBtn">Режим: Турники (Tab)</button>
+    <button class="top-btn" id="replayBtn">Повтор (P)</button>
+    <button class="top-btn" id="restartBtn">Рестарт (R)</button>
+</div>
+
+<div id="replayBar">
+    <span style="color:#e74c3c;">● REPLAY</span>
+    <input type="range" id="replaySlider" min="0" max="100" value="0">
+</div>
+
+<div id="controls">
+    <div class="btn-group">
+        <div class="ctrl-btn" id="btnArch">ARCH<span>[A / ←]</span></div>
+        <div class="ctrl-btn" id="btnTuck">TUCK<span>[W / ↑]</span></div>
+        <div class="ctrl-btn" id="btnPike">PIKE<span>[S / ↓]</span></div>
+        <div class="ctrl-btn" id="btnLayout">LAYOUT<span>[D / →]</span></div>
+    </div>
+    <div class="btn-group">
+        <div class="ctrl-btn" id="btnSlow">SLOW-MO<span>[Shift]</span></div>
+        <div class="ctrl-btn" id="btnLimp">RAGDOLL<span>[G]</span></div>
+        <div class="ctrl-btn" id="btnRelease">RELEASE<span>[Space]</span></div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Математические функции
+const PI = Math.PI;
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const normAngle = (a) => {
+    while (a > PI) a -= 2 * PI;
+    while (a < -PI) a += 2 * PI;
+    return a;
+};
+const rotateVec = (x, y, ang) => {
+    const c = Math.cos(ang), s = Math.sin(ang);
+    return { x: x * c - y * s, y: x * s + y * c };
+};
+
+// Индексы суставов скелета
+const PART = {
+    HEAD: 0,
+    SHOULDER: 1,
+    PELVIS: 2,
+    KNEE: 3,
+    FOOT: 4,
+    ELBOW: 5,
+    HAND: 6
+};
+
+// Состояние управления
+const input = {
+    arch: false,
+    tuck: false,
+    pike: false,
+    layout: false,
+    slow: false,
+    limp: false
+};
+
+// Состояние игры
+let gameMode = 0; // 0 = Турники, 1 = Акробатика и батуты
+let bars = [];
+let platforms = [];
+let particles = [];
+let clouds = [
+    { x: 150, y: 110 }, { x: 650, y: 70 }, { x: 1200, y: 130 },
+    { x: 1800, y: 85 }, { x: 2450, y: 120 }, { x: 3100, y: 80 }
+];
+
+let replayBuffer = [];
+let isReplay = false;
+let replayIndex = 0;
+
+// UI Элементы
+const scoreEl = document.getElementById('score');
+const comboEl = document.getElementById('combo');
+const trickEl = document.getElementById('trickPopup');
+const replayBar = document.getElementById('replayBar');
+const replaySlider = document.getElementById('replaySlider');
+let trickTimer = 0;
+
+function showTrick(text, color = '#ffffff') {
+    trickEl.textContent = text;
+    trickEl.style.color = color;
+    trickEl.style.opacity = '1';
+    trickEl.style.transform = 'translate(-50%, -60%) scale(1.08)';
+    trickTimer = 1.6;
+}
+
+// Класс гимнаста (7 физических точек + угловые пружины мышц)
+class Gymnast {
+    constructor() {
+        this.pts = [];
+        this.bones = [];
+        this.muscles = [];
+        this.pose = 'LAYOUT';
+        this.isGrabbing = false;
+        this.grabbedBar = -1;
+        this.grabCooldown = 0;
+        this.isStuck = false;
+        this.stuckPos = { x: 0, y: 0 };
+        this.score = 0;
+        this.combo = 0;
+        this.flips = 0;
+        this.totalRot = 0;
+        this.lastAngle = 0;
+    }
+
+    init(startPos) {
+        const armUp = 34, armLow = 34, neck = 22, torso = 58, thigh = 46, shin = 46;
+        const makePt = (x, y, mass, r, pinned = false) => ({ x, y, ox: x, oy: y, mass, r, pinned });
+
+        this.pts = [
+            makePt(startPos.x, startPos.y + armLow + armUp - neck, 1.1, 16), // HEAD
+            makePt(startPos.x, startPos.y + armLow + armUp, 1.6, 12),        // SHOULDER
+            makePt(startPos.x, startPos.y + armLow + armUp + torso, 2.0, 13),// PELVIS
+            makePt(startPos.x, startPos.y + armLow + armUp + torso + thigh, 1.2, 9), // KNEE
+            makePt(startPos.x, startPos.y + armLow + armUp + torso + thigh + shin, 0.9, 8), // FOOT
+            makePt(startPos.x, startPos.y + armLow, 0.9, 8),                 // ELBOW
+            makePt(startPos.x, startPos.y, 0.8, 8, true)                     // HAND
+        ];
+
+        this.bones = [
+            { a: PART.HAND, b: PART.ELBOW, len: armLow, stiff: 1.0 },
+            { a: PART.ELBOW, b: PART.SHOULDER, len: armUp, stiff: 1.0 },
+            { a: PART.SHOULDER, b: PART.HEAD, len: neck, stiff: 1.0 },
+            { a: PART.SHOULDER, b: PART.PELVIS, len: torso, stiff: 1.0 },
+            { a: PART.PELVIS, b: PART.KNEE, len: thigh, stiff: 1.0 },
+            { a: PART.KNEE, b: PART.FOOT, len: shin, stiff: 1.0 },
+            { a: PART.HAND, b: PART.SHOULDER, len: armLow + armUp, stiff: 0.35 }
+        ];
+
+        this.muscles = [
+            { a: PART.PELVIS, b: PART.SHOULDER, c: PART.HEAD, target: PI, str: 0.45 },
+            { a: PART.PELVIS, b: PART.SHOULDER, c: PART.ELBOW, target: PI, str: 0.45 },
+            { a: PART.SHOULDER, b: PART.ELBOW, c: PART.HAND, target: 0, str: 0.50 },
+            { a: PART.SHOULDER, b: PART.PELVIS, c: PART.KNEE, target: 0, str: 0.55 },
+            { a: PART.PELVIS, b: PART.KNEE, c: PART.FOOT, target: 0, str: 0.55 }
+        ];
+
+        this.isGrabbing = true;
+        this.grabbedBar = 0;
+        this.grabCooldown = 0;
+        this.isStuck = false;
+        this.flips = 0;
+        this.totalRot = 0;
+        this.combo = 0;
+        this.lastAngle = this.getTorsoAngle();
+    }
+
+    getTorsoAngle() {
+        const s = this.pts[PART.SHOULDER];
+const p = this.pts[PART.PELVIS];
+return Math.atan2(s.y - p.y, s.x - p.x);
+}
+getCOM() {
+let sx = 0, sy = 0, tm = 0;
+for (const p of this.pts) {
+sx += p.x * p.mass;
+sy += p.y * p.mass;
+tm += p.mass;
+}
+return { x: sx / tm, y: sy / tm };
+}
+updateMuscles() {
+let neck = PI, sh = PI, elb = 0, hip = 0, knee = 0, pow = 0.45;
+if (this.pose === 'LAYOUT') {
+sh = this.isGrabbing ? PI : 0.35;
+pow = 0.42;
+} else if (this.pose === 'ARCH') {
+neck = PI - 0.35;
+sh = this.isGrabbing ? PI - 0.25 : PI - 0.4;
+hip = -0.55;
+knee = -0.45;
+pow = 0.48;
+} else if (this.pose === 'TUCK') {
+neck = PI + 0.45;
+sh = this.isGrabbing ? PI + 0.35 : 0.75;
+elb = this.isGrabbing ? 0.2 : 1.1;
+hip = 2.15;
+knee = -2.25;
+pow = 0.65;
+} else if (this.pose === 'PIKE') {
+neck = PI + 0.35;
+sh = this.isGrabbing ? PI + 0.3 : 0.95;
+elb = 0.1;
+hip = 1.85;
+knee = 0.05;
+pow = 0.58;
+} else if (this.pose === 'SQUAT') {
+neck = PI + 0.2;
+sh = 0.8;
+elb = 0.2;
+hip = 1.35;
+knee = -1.65;
+pow = 0.50;
+} else if (this.pose === 'LIMP') {
+pow = 0.02;
+}
+this.muscles[0].target = neck;
+this.muscles[1].target = sh;
+this.muscles[2].target = elb;
+this.muscles[3].target = hip;
+this.muscles[4].target = knee;
+for (const m of this.muscles) m.str = pow;
+}
+solveMuscle(m) {
+if (m.str <= 0.001) return;
+const pA = this.pts[m.a], pB = this.pts[m.b], pC = this.pts[m.c];
+const v1x = pA.x - pB.x, v1y = pA.y - pB.y;
+const v2x = pC.x - pB.x, v2y = pC.y - pB.y;
+if (Math.hypot(v1x, v1y) < 0.001 || Math.hypot(v2x, v2y) < 0.001) return;
+const curAng = Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y);
+const diff = normAngle(m.target - curAng);
+const corr = clamp(diff * m.str * 0.25, -0.22, 0.22);
+if (!pC.pinned) {
+const rv2 = rotateVec(v2x, v2y, corr);
+pC.x = pB.x + rv2.x;
+pC.y = pB.y + rv2.y;
+}
+if (!pA.pinned) {
+const rv1 = rotateVec(v1x, v1y, -corr * 0.5);
+pA.x = pB.x + rv1.x;
+pA.y = pB.y + rv1.y;
+}
+}
+release() {
+if (!this.isGrabbing) return;
+this.isGrabbing = false;
+this.pts[PART.HAND].pinned = false;
+this.grabCooldown = 0.28;
+const h = this.pts[PART.HAND], s = this.pts[PART.SHOULDER];
+const dx = h.x - s.x, dy = h.y - s.y;
+const len = Math.hypot(dx, dy) || 1;
+for (const p of this.pts) {
+if (!p.pinned) {
+p.ox += (dx / len) * 1.8;
+p.oy += (dy / len) * 1.8;
+}
+}
+}
+jump() {
+this.isStuck = false;
+this.pts[PART.FOOT].pinned = false;
+for (const p of this.pts) {
+p.y -= 4;
+p.oy = p.y + 12.0;
+p.ox = p.x - 4.5;
+}
+this.pts[PART.HEAD].ox -= 3.5;
+this.pts[PART.FOOT].ox += 3.5;
+}
+step(dt) {
+if (this.grabCooldown > 0) this.grabCooldown -= dt;
+this.updateMuscles();
+const GRAVITY = 980;
+const drag = 0.9965;
+// Интегрирование Верле
+for (const p of this.pts) {
+if (p.pinned) continue;
+const vx = (p.x - p.ox) * drag;
+const vy = (p.y - p.oy) * drag;
+p.ox = p.x;
+p.oy = p.y;
+p.x += vx;
+p.y += vy + GRAVITY * dt * dt;
+}
+// Раскачка на турнике
+if (this.isGrabbing && this.grabbedBar >= 0) {
+const bar = bars[this.grabbedBar];
+const hand = this.pts[PART.HAND];
+hand.x = hand.ox = bar.x;
+hand.y = hand.oy = bar.y;
+const pel = this.pts[PART.PELVIS];
+const rx = pel.x - bar.x, ry = pel.y - bar.y;
+const rLen = Math.hypot(rx, ry) || 1;
+const tx = -ry / rLen, ty = rx / rLen;
+let pump = 0;
+if (this.pose === 'ARCH') pump = 340;
+else if (this.pose === 'TUCK' || this.pose === 'PIKE') pump = -340;
+if (pump !== 0) {
+pel.x += tx * pump * dt * dt;
+pel.y += ty * pump * dt * dt;
+this.pts[PART.FOOT].x += tx * pump * 1.2 * dt * dt;
+this.pts[PART.FOOT].y += ty * pump * 1.2 * dt * dt;
+}
+}
+// Вращение в воздухе
+if (!this.isGrabbing && !this.isStuck && this.pose !== 'LIMP') {
+const com = this.getCOM();
+let torque = 0;
+if (this.pose === 'TUCK') torque = -520;
+else if (this.pose === 'PIKE') torque = -380;
+else if (this.pose === 'ARCH') torque = 360;
+if (torque !== 0) {
+for (const p of this.pts) {
+if (p.pinned) continue;
+const rx = p.x - com.x, ry = p.y - com.y;
+p.x += (-ry) * torque * 0.004 * dt * dt;
+p.y += (rx) * torque * 0.004 * dt * dt;
+}
+}
+}
+// Солвер костей, мышц и столкновений
+for (let iter = 0; iter < 12; iter++) {
+for (const m of this.muscles) this.solveMuscle(m);
+for (const b of this.bones) {
+const pA = this.pts[b.a], pB = this.pts[b.b];
+const dx = pB.x - pA.x, dy = pB.y - pA.y;
+const dist = Math.hypot(dx, dy);
+if (dist < 0.0001) continue;
+const diff = (dist - b.len) / dist;
+const ox = dx * diff * 0.5 * b.stiff;
+const oy = dy * diff * 0.5 * b.stiff;
+if (!pA.pinned && !pB.pinned) {
+pA.x += ox; pA.y += oy;
+pB.x -= ox; pB.y -= oy;
+} else if (!pA.pinned) {
+pA.x += ox * 2; pA.y += oy * 2;
+} else if (!pB.pinned) {
+pB.x -= ox * 2; pB.y -= oy * 2;
+}
+}
+if (this.isGrabbing && this.grabbedBar >= 0) {
+this.pts[PART.HAND].x = bars[this.grabbedBar].x;
+this.pts[PART.HAND].y = bars[this.grabbedBar].y;
+}
+if (this.isStuck) {
+this.pts[PART.FOOT].x = this.stuckPos.x;
+this.pts[PART.FOOT].y = this.stuckPos.y;
+}
+// Столкновения с платформами и батутами
+for (const plat of platforms) {
+for (let i = 0; i < this.pts.length; i++) {
+const p = this.pts[i];
+if (p.pinned) continue;
+const cx = clamp(p.x, plat.x, plat.x + plat.w);
+const cy = clamp(p.y, plat.y, plat.y + plat.h);
+const dx = p.x - cx, dy = p.y - cy;
+const dSq = dx * dx + dy * dy;
+if (dSq < p.r * p.r) {
+const dist = Math.sqrt(dSq);
+let nx = 0, ny = -1;
+if (dist > 0.0001) { nx = dx / dist; ny = dy / dist; }
+p.x += nx * (p.r - dist);
+p.y += ny * (p.r - dist);
+const vx = p.x - p.ox, vy = p.y - p.oy;
+if (plat.trampoline && ny < -0.5 && vy > 1.0) {
+const bounce = Math.max(vy * plat.bounce, 19.0);
+p.oy = p.y + bounce;
+plat.comp = 16;
+spawnParticles(p.x, p.y, '#f1c40f', 8);
+} else {
+const tx = -ny, ty = nx;
+let vn = vx * nx + vy * ny;
+let vt = (vx * tx + vy * ty) * 0.78;
+if (vn < 0) vn = 0;
+p.ox = p.x - (nx * vn + tx * vt);
+p.oy = p.y - (ny * vn + ty * vt);
+// Проверка приземления на ноги (Stuck Landing)
+if (i === PART.FOOT && ny < -0.7 && !this.isStuck && this.pose !== 'LIMP') {
+const angDiff = Math.abs(normAngle(this.getTorsoAngle() - (-PI * 0.5)));
+const spd = Math.hypot(vx, vy);
+if (angDiff < 0.55 && spd < 16.5 && this.flips >= 1) {
+this.isStuck = true;
+this.stuckPos = { x: p.x, y: p.y };
+p.pinned = true;
+this.pose = 'SQUAT';
+const ptsEarned = this.flips * 100 + this.combo * 150;
+this.score += ptsEarned;
+showTrick(STUCK LANDING! +${ptsEarned}, '#2ecc71');
+this.flips = 0;
+this.totalRot = 0;
+spawnParticles(p.x, p.y, '#2ecc71', 15);
+}
+}
+}
+}
+}
+}
+}
+// Перехват турников
+if (!this.isGrabbing && this.grabCooldown <= 0 && this.pose !== 'LIMP') {
+const h = this.pts[PART.HAND];
+for (let i = 0; i < bars.length; i++) {
+if (Math.hypot(h.x - bars[i].x, h.y - bars[i].y) < 34) {
+this.isGrabbing = true;
+this.grabbedBar = i;
+h.x = h.ox = bars[i].x;
+h.y = h.oy = bars[i].y;
+h.pinned = true;
+this.isStuck = false;
+this.pts[PART.FOOT].pinned = false;
+this.combo++;
+const bonus = (this.flips > 0 ? this.flips * 120 : 50) * this.combo;
+this.score += bonus;
+if (this.flips > 0) {
+showTrick(${this.flips}x FLIP REGRAB! +${bonus}, '#f1c40f');
+} else {
+showTrick(CATCH! x${this.combo}, '#ffffff');
+}
+this.flips = 0;
+this.totalRot = 0;
+spawnParticles(bars[i].x, bars[i].y, '#ffffff', 12);
+break;
+}
+}
+}
+// Подсчет сальто
+const curAng = this.getTorsoAngle();
+const deltaAng = normAngle(curAng - this.lastAngle);
+this.lastAngle = curAng;
+if (!this.isGrabbing && !this.isStuck) {
+this.totalRot += deltaAng;
+const f = Math.floor(Math.abs(this.totalRot) / (2 * PI * 0.88));
+if (f > this.flips) {
+this.flips = f;
+showTrick(${this.flips}x FLIP!);
+}
+} else {
+this.totalRot = 0;
+}
+}
+drawCapsule(a, b, rA, rB, color, outline = '#191e26') {
+const dx = b.x - a.x, dy = b.y - a.y;
+const len = Math.hypot(dx, dy);
+const drawPass = (radiusAdd, fill) => {
+ctx.fillStyle = fill;
+ctx.beginPath();
+ctx.arc(a.x, a.y, rA + radiusAdd, 0, PI * 2);
+ctx.arc(b.x, b.y, rB + radiusAdd, 0, PI * 2);
+ctx.fill();
+if (len > 0.1) {
+const px = -dy / len, py = dx / len;
+ctx.beginPath();
+ctx.moveTo(a.x + px * (rA + radiusAdd), a.y + py * (rA + radiusAdd));
+ctx.lineTo(b.x + px * (rB + radiusAdd), b.y + py * (rB + radiusAdd));
+ctx.lineTo(b.x - px * (rB + radiusAdd), b.y - py * (rB + radiusAdd));
+ctx.lineTo(a.x - px * (rA + radiusAdd), a.y - py * (rA + radiusAdd));
+ctx.closePath();
+ctx.fill();
+}
+};
+drawPass(2.5, outline);
+drawPass(0, color);
+}
+draw() {
+const p = this.pts;
+const off = (pt) => ({ x: pt.x + 4, y: pt.y + 2 });
+// Дальние конечности (затененные)
+this.drawCapsule(off(p[PART.PELVIS]), off(p[PART.KNEE]), 11, 9, '#1e272e');
+this.drawCapsule(off(p[PART.KNEE]), off(p[PART.FOOT]), 9, 7, '#1e272e');
+this.drawCapsule(off(p[PART.SHOULDER]), off(p[PART.ELBOW]), 8, 6.5, '#ebbfa0');
+this.drawCapsule(off(p[PART.ELBOW]), off(p[PART.HAND]), 6.5, 5.5, '#ebbfa0');
+// Торс
+this.drawCapsule(p[PART.PELVIS], p[PART.SHOULDER], 13, 15, '#2e86de');
+// Голова и повязка
+const h = p[PART.HEAD], s = p[PART.SHOULDER];
+ctx.fillStyle = '#ffdbbc';
+ctx.strokeStyle = '#191e26';
+ctx.lineWidth = 2.5;
+ctx.beginPath();
+ctx.arc(h.x, h.y, 17, 0, PI * 2);
+ctx.fill();
+ctx.stroke();
+const nAng = Math.atan2(h.y - s.y, h.x - s.x);
+ctx.save();
+ctx.translate(h.x + Math.cos(nAng) * 4, h.y + Math.sin(nAng) * 4);
+ctx.rotate(nAng + PI / 2);
+ctx.fillStyle = '#ee5253';
+ctx.fillRect(-16.5, -3, 33, 6);
+ctx.restore();
+// Ближние ноги и кроссовок
+this.drawCapsule(p[PART.PELVIS], p[PART.KNEE], 11.5, 9.5, '#2c3a47');
+this.drawCapsule(p[PART.KNEE], p[PART.FOOT], 9.5, 7.5, '#2c3a47');
+ctx.fillStyle = '#f5f6fa';
+ctx.beginPath();
+ctx.arc(p[PART.FOOT].x, p[PART.FOOT].y, 8.5, 0, PI * 2);
+ctx.fill();
+ctx.stroke();
+// Ближние руки и напульсник
+this.drawCapsule(p[PART.SHOULDER], p[PART.ELBOW], 8.5, 7, '#ffdbbc');
+this.drawCapsule(p[PART.ELBOW], p[PART.HAND], 7, 6, '#ffdbbc');
+ctx.fillStyle = '#ee5253';
+ctx.beginPath();
+ctx.arc(p[PART.HAND].x, p[PART.HAND].y, 6.5, 0, PI * 2);
+ctx.fill();
+}
+}
+function spawnParticles(x, y, color, count) {
+for (let i = 0; i < count; i++) {
+particles.push({
+x, y,
+vx: (Math.random() - 0.5) * 240,
+vy: (Math.random() - 0.7) * 240,
+life: 0.55,
+maxLife: 0.55,
+size: 4 + Math.random() * 2,
+color
+});
+}
+}
+const player = new Gymnast();
+function loadLevel(mode) {
+particles = [];
+replayBuffer = [];
+isReplay = false;
+replayBar.style.display = 'none';
+document.getElementById('replayBtn').classList.remove('active');
+if (mode === 0) {
+bars = [
+{ x: 250, y: 280 },
+{ x: 640, y: 250 },
+{ x: 1060, y: 290 },
+{ x: 1500, y: 210 },
+{ x: 1980, y: 260 },
+{ x: 2480, y: 190 },
+{ x: 3000, y: 250 }
+];
+platforms = [
+{ x: -600, y: 620, w: 6000, h: 300, color: '#dce1e8', outline: '#b4bcc6', trampoline: false },
+{ x: 100, y: 595, w: 3200, h: 25, color: '#3498db', outline: '#2980b9', trampoline: false },
+{ x: 1220, y: 578, w: 150, h: 20, color: '#2ecc71', outline: '#27ae60', trampoline: true, bounce: 1.38, comp: 0 }
+];
+document.getElementById('modeBtn').textContent = 'Режим: Турники (Tab)';
+} else {
+bars = [{ x: 220, y: 260 }];
+platforms = [
+{ x: -600, y: 620, w: 7000, h: 300, color: '#dce1e8', outline: '#b4bcc6', trampoline: false },
+{ x: 100, y: 595, w: 4500, h: 25, color: '#9b59b6', outline: '#8e44ad', trampoline: false },
+{ x: 520, y: 578, w: 180, h: 20, color: '#f1c40f', outline: '#f39c12', trampoline: true, bounce: 1.48, comp: 0 },
+{ x: 1050, y: 520, w: 260, h: 75, color: '#3498db', outline: '#2980b9', trampoline: false },
+{ x: 1550, y: 578, w: 200, h: 20, color: '#e74c3c', outline: '#c0392b', trampoline: true, bounce: 1.68, comp: 0 },
+{ x: 2150, y: 460, w: 320, h: 135, color: '#2ecc71', outline: '#27ae60', trampoline: false }
+];
+document.getElementById('modeBtn').textContent = 'Режим: Акробатика (Tab)';
+}
+player.score = 0;
+player.init(bars[0]);
+}
+loadLevel(gameMode);
+// Обработка клавиатуры
+window.addEventListener('keydown', (e) => {
+if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.arch = true;
+if (e.code === 'KeyW' || e.code === 'ArrowUp') input.tuck = true;
+if (e.code === 'KeyS' || e.code === 'ArrowDown') input.pike = true;
+if (e.code === 'KeyD' || e.code === 'ArrowRight') input.layout = true;
+if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.slow = true;
+if (e.code === 'KeyG') input.limp = true;
+if (e.code === 'Space') {
+e.preventDefault();
+if (!isReplay) {
+if (player.isGrabbing) player.release();
+else if (player.isStuck) player.jump();
+}
+}
+if (e.code === 'KeyR') loadLevel(gameMode);
+if (e.code === 'Tab') {
+e.preventDefault();
+gameMode = (gameMode + 1) % 2;
+loadLevel(gameMode);
+}
+if (e.code === 'KeyP') toggleReplay();
+});
+window.addEventListener('keyup', (e) => {
+if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.arch = false;
+if (e.code === 'KeyW' || e.code === 'ArrowUp') input.tuck = false;
+if (e.code === 'KeyS' || e.code === 'ArrowDown') input.pike = false;
+if (e.code === 'KeyD' || e.code === 'ArrowRight') input.layout = false;
+if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.slow = false;
+if (e.code === 'KeyG') input.limp = false;
+});
+// Подключение экранных кнопок (мышь / тач)
+function bindHoldBtn(id, key) {
+const el = document.getElementById(id);
+const down = (e) => { e.preventDefault(); input[key] = true; };
+const up = (e) => { e.preventDefault(); input[key] = false; };
+el.addEventListener('mousedown', down);
+el.addEventListener('mouseup', up);
+el.addEventListener('mouseleave', up);
+el.addEventListener('touchstart', down);
+el.addEventListener('touchend', up);
+}
+bindHoldBtn('btnArch', 'arch');
+bindHoldBtn('btnTuck', 'tuck');
+bindHoldBtn('btnPike', 'pike');
+bindHoldBtn('btnLayout', 'layout');
+bindHoldBtn('btnSlow', 'slow');
+bindHoldBtn('btnLimp', 'limp');
+document.getElementById('btnRelease').addEventListener('mousedown', (e) => {
+e.preventDefault();
+if (!isReplay) {
+if (player.isGrabbing) player.release();
+else if (player.isStuck) player.jump();
+}
+});
+document.getElementById('restartBtn').addEventListener('click', () => loadLevel(gameMode));
+document.getElementById('modeBtn').addEventListener('click', () => {
+gameMode = (gameMode + 1) % 2;
+loadLevel(gameMode);
+});
+document.getElementById('replayBtn').addEventListener('click', toggleReplay);
+function toggleReplay() {
+if (replayBuffer.length === 0) return;
+isReplay = !isReplay;
+replayBar.style.display = isReplay ? 'flex' : 'none';
+document.getElementById('replayBtn').classList.toggle('active', isReplay);
+replaySlider.max = replayBuffer.length - 1;
+replayIndex = 0;
+}
+replaySlider.addEventListener('input', () => {
+replayIndex = parseInt(replaySlider.value, 10);
+});
+// Камера и главный цикл
+let camX = 250, camY = 350, camZoom = 1.0;
+let lastTime = performance.now();
+function loop(now) {
+const rawDt = Math.min((now - lastTime) / 1000, 0.033);
+lastTime = now;
+// Подсветка кнопок
+document.getElementById('btnArch').classList.toggle('pressed', input.arch);
+document.getElementById('btnTuck').classList.toggle('pressed', input.tuck);
+document.getElementById('btnPike').classList.toggle('pressed', input.pike);
+document.getElementById('btnLayout').classList.toggle('pressed', input.layout);
+document.getElementById('btnSlow').classList.toggle('pressed', input.slow);
+document.getElementById('btnLimp').classList.toggle('pressed', input.limp);
+if (trickTimer > 0) {
+trickTimer -= rawDt;
+if (trickTimer <= 0) {
+trickEl.style.opacity = '0';
+trickEl.style.transform = 'translate(-50%, -50%) scale(1.0)';
+}
+}
+if (!isReplay) {
+if (input.limp) {
+player.pose = 'LIMP';
+if (player.isGrabbing) player.release();
+} else if (input.tuck) {
+player.pose = 'TUCK';
+} else if (input.pike) {
+player.pose = 'PIKE';
+} else if (input.arch) {
+player.pose = 'ARCH';
+} else if (input.layout) {
+player.pose = 'LAYOUT';
+} else if (!player.isStuck) {
+player.pose = 'LAYOUT';
+}
+const simDt = rawDt * (input.slow ? 0.35 : 1.0);
+player.step(simDt * 0.5);
+player.step(simDt * 0.5);
+for (const plat of platforms) {
+if (plat.trampoline) plat.comp = lerp(plat.comp, 0, rawDt * 12);
+}
+for (let i = particles.length - 1; i >= 0; i--) {
+const pt = particles[i];
+pt.x += pt.vx * simDt;
+pt.y += pt.vy * simDt;
+pt.vy += 300 * simDt;
+pt.life -= simDt;
+if (pt.life <= 0) particles.splice(i, 1);
+}
+// Запись кадра повтора
+replayBuffer.push({
+pts: player.pts.map(p => ({ x: p.x, y: p.y })),
+pose: player.pose
+});
+if (replayBuffer.length > 600) replayBuffer.shift();
+} else if (replayBuffer.length > 0) {
+const frame = replayBuffer[replayIndex];
+for (let i = 0; i < player.pts.length; i++) {
+player.pts[i].x = frame.pts[i].x;
+player.pts[i].y = frame.pts[i].y;
+}
+player.pose = frame.pose;
+replaySlider.value = replayIndex;
+replayIndex = (replayIndex + 1) % replayBuffer.length;
+}
+scoreEl.textContent = player.score;
+comboEl.textContent = player.combo > 1 ? COMBO x${player.combo} : '';
+// Слежение камеры
+const com = player.getCOM();
+const targetX = com.x + 140;
+const targetY = clamp(com.y - 40, -250, 380);
+camX = lerp(camX, targetX, rawDt * 6);
+camY = lerp(camY, targetY, rawDt * 6);
+const targetZoom = com.y < 140 ? 0.82 : 1.0;
+camZoom = lerp(camZoom, targetZoom, rawDt * 3);
+// Отрисовка неба
+const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+grad.addColorStop(0, '#74b9ff');
+grad.addColorStop(1, '#d6eaf8');
+ctx.fillStyle = grad;
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+ctx.save();
+ctx.translate(canvas.width / 2, canvas.height / 2);
+ctx.scale(camZoom, camZoom);
+ctx.translate(-camX, -camY);
+// Облака
+ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+for (const c of clouds) {
+ctx.beginPath();
+ctx.arc(c.x, c.y + 10, 38, 0, PI * 2);
+ctx.arc(c.x + 35, c.y, 48, 0, PI * 2);
+ctx.arc(c.x + 75, c.y + 12, 34, 0, PI * 2);
+ctx.fill();
+}
+// Платформы, маты и батуты
+for (const plat of platforms) {
+const comp = plat.trampoline ? plat.comp : 0;
+ctx.fillStyle = plat.color;
+ctx.strokeStyle = plat.outline;
+ctx.lineWidth = 3;
+ctx.fillRect(plat.x, plat.y + comp, plat.w, plat.h - comp * 0.5);
+ctx.strokeRect(plat.x, plat.y + comp, plat.w, plat.h - comp * 0.5);
+if (plat.trampoline) {
+ctx.fillStyle = '#34495e';
+ctx.fillRect(plat.x + 12, plat.y + plat.h, 8, 22);
+ctx.fillRect(plat.x + plat.w - 20, plat.y + plat.h, 8, 22);
+}
+}
+// Турники
+for (const bar of bars) {
+ctx.fillStyle = '#95a5a6';
+ctx.strokeStyle = '#7f8c8d';
+ctx.lineWidth = 2;
+ctx.fillRect(bar.x - 5, bar.y, 10, 600 - bar.y);
+ctx.strokeRect(bar.x - 5, bar.y, 10, 600 - bar.y);
+ctx.fillStyle = '#e74c3c';
+ctx.strokeStyle = '#2c3e50';
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.arc(bar.x, bar.y, 10, 0, PI * 2);
+ctx.fill();
+ctx.stroke();
+}
+// Тень гимнаста
+const shR = clamp(32 - (595 - com.y) * 0.04, 8, 32);
+ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+ctx.beginPath();
+ctx.ellipse(com.x, 595, shR, shR * 0.25, 0, 0, PI * 2);
+ctx.fill();
+// Гимнаст
+player.draw();
+// Частицы
+for (const pt of particles) {
+ctx.globalAlpha = clamp(pt.life / pt.maxLife, 0, 1);
+ctx.fillStyle = pt.color;
+ctx.beginPath();
+ctx.arc(pt.x, pt.y, pt.size, 0, PI * 2);
+ctx.fill();
+}
+ctx.globalAlpha = 1;
+ctx.restore();
+requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
